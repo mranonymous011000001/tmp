@@ -5,7 +5,7 @@ $Cookie     = "admNoE=%C7%0D%90%E6%E8; fyE=%C4%0A%97%E2; loginByE=%A5N%D0%B3%B8%
 $Timeout    = 120 
 $OutputFile = Join-Path $env:TEMP "Internal_Crawl_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
 
-# Fixed: Removed the trailing comma at the end of the list
+# Fixed list: No trailing comma on the final item
 $Paths = @(
     "/",
     "/schoolexpert",
@@ -33,6 +33,7 @@ $AllResults = @()
 
 Write-Host "Starting Data Extraction..." -ForegroundColor Cyan
 Write-Host "Target: $BaseUrl"
+Write-Host "Timeout set to $Timeout seconds per request."
 
 foreach ($Path in $Paths) {
     $FullUrl = "$BaseUrl$Path"
@@ -47,16 +48,16 @@ foreach ($Path in $Paths) {
     }
 
     try {
-        # Perform request
+        # Perform request with 2-minute timeout
         $Response = Invoke-WebRequest -Uri $FullUrl -Headers $Headers -Method Get -UseBasicParsing -TimeoutSec $Timeout -ErrorAction Stop
         
         $Entry.status_code   = [int]$Response.StatusCode
         $Entry.content_found = $true
         
-        # Convert response to Base64 to handle ASP/PHP output safely
+        # Convert response to Base64 to safely handle all data types
         $RawBytes = $Response.Content
         if ($RawBytes -is [string]) {
-            $RawBytes = [System.Text.Encoding]::UTF8.GetBytes($RawBytes)
+            $RawBytes =[System.Text.Encoding]::UTF8.GetBytes($RawBytes)
         }
         $Entry.base64_body = [Convert]::ToBase64String($RawBytes)
         
@@ -73,11 +74,11 @@ foreach ($Path in $Paths) {
     $AllResults += $Entry
 }
 
-# Save results to single JSON file
+# Consolidate all data into the single JSON file
 try {
     $AllResults | ConvertTo-Json -Depth 10 | Set-Content -Path $OutputFile -Encoding UTF8
-    Write-Host "`nComplete." -ForegroundColor Cyan
-    Write-Host "File saved to: " -NoNewline
+    Write-Host "`nProcessing Complete." -ForegroundColor Cyan
+    Write-Host "Data saved to: " -NoNewline
     Write-Host $OutputFile -ForegroundColor Yellow
 } catch {
     Write-Host "Save Error: $($_.Exception.Message)" -ForegroundColor Red
