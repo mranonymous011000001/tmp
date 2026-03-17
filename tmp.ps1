@@ -2,16 +2,15 @@
 $BaseUrl    = "http://192.168.29.20"
 $UserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 $Cookie     = "lock=; path=/schoolexpert,lastFY=2025; path=/schoolexpert,fy=2025; path=/schoolexpert,userno=1; path=/schoolexpert"
+$Timeout    = 120 # <--- THIS WAS MISSING
 $OutputFile = Join-Path $env:TEMP "Protocol_Analysis_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
 
 $Paths = @(
-
     "/schoolexpert/top.asp",
     "/schoolexpert/main.asp",
     "/schoolexpert/newmain.asp",
     "/schoolexpert/logout.asp",
-    "/schoolexpert/top.txt"
-
+    
 )
 
 $RequestHeaders = @{
@@ -57,7 +56,7 @@ foreach ($Path in $Paths) {
         $Stopwatch.Stop()
 
         # Capture Response Details
-        $LogEntry.response.status_code = [int]$Resp.StatusCode
+        $LogEntry.response.status_code =[int]$Resp.StatusCode
         $LogEntry.response.status_desc = $Resp.StatusDescription
         $LogEntry.response.latency_ms  = $Stopwatch.ElapsedMilliseconds
         
