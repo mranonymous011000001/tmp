@@ -4,37 +4,39 @@ $url = "https://wispy-sunset-a7c0.anox.workers.dev/"
 Write-Host "[*] Checking endpoint..." -ForegroundColor Cyan
 
 try {
-    # Step 1: GET request (like ping)
-    $response = Invoke-WebRequest -Uri $url -Method GET -UseBasicParsing -TimeoutSec 10
-
+    $response = Invoke-WebRequest -Uri $url -Method GET -TimeoutSec 10
     $status = "UP"
     $statusCode = $response.StatusCode
-
-    Write-Host "[+] Server is reachable (Status: $statusCode)" -ForegroundColor Green
+    Write-Host "[+] Server reachable (Status: $statusCode)" -ForegroundColor Green
 }
 catch {
     $status = "DOWN"
-    $statusCode = $_.Exception.Response.StatusCode.value__ 2>$null
-
-    Write-Host "[-] Server is not reachable" -ForegroundColor Red
+    $statusCode = "N/A"
+    Write-Host "[-] Server not reachable" -ForegroundColor Red
 }
 
-# Step 2: Prepare POST data
+# Prepare JSON body
 $body = @{
     status     = $status
     statusCode = $statusCode
     timestamp  = (Get-Date).ToString("o")
-} | ConvertTo-Json
+} | ConvertTo-Json -Depth 3
 
 Write-Host "[*] Sending POST request..." -ForegroundColor Cyan
 
 try {
-    $postResponse = Invoke-WebRequest -Uri $url -Method POST -Body $body -ContentType "application/json"
+    $postResponse = Invoke-RestMethod -Uri $url `
+        -Method POST `
+        -Body $body `
+        -ContentType "application/json" `
+        -Headers @{
+            "User-Agent" = "Mozilla/5.0"
+        }
 
-    Write-Host "[+] POST Response:" -ForegroundColor Green
-    Write-Output $postResponse.Content
+    Write-Host "[+] POST Success:" -ForegroundColor Green
+    $postResponse | ConvertTo-Json -Depth 5
 }
 catch {
-    Write-Host "[-] POST request failed" -ForegroundColor Red
-    Write-Output $_
+    Write-Host "[-] POST failed (detailed):" -ForegroundColor Red
+    $_ | Format-List * -Force
 }
