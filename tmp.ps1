@@ -1,8 +1,7 @@
 # --- Configuration ---
 $BaseUrl    = "http://192.168.29.20"
 $UserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-$Cookie     = "admNoE=%C7%0D%90%E6%E8; fyE=%C4%0A%97%E2; loginByE=%A5N%D0%B3%B8%23%08; admNo=17515; fy=2025; loginBy=Student; userno=1; lock=none; _gid=GA1.2.1932742890.1772021591; userno=1; fy=2025; usernoT=jXycB19tcRyJD3LguLToZbBvdfyJ%2BLiKzIIlSoz0PFLqgddd2Ufoad7x6VPZAB3OXObTIowXsQDWkBsnHGYKZw%3D%3D; fyT=B0%2FrbDxWkgqbNNx35RCvqVFiWwnid5j6BIx8jPC%2FgGylGzOut0gbS2dOm1Jt5uyuH5Gx5uVbs8khxUzY8HYmqw%3D%3D;"
-$Timeout    = 120 
+$Cookie     = "lock=; path=/schoolexpert,lastFY=2025; path=/schoolexpert,fy=2025; path=/schoolexpert,userno=1; path=/schoolexpert"
 $OutputFile = Join-Path $env:TEMP "Protocol_Analysis_$(Get-Date -Format 'yyyyMMdd_HHmm').json"
 
 $Paths = @(
