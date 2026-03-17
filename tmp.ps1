@@ -8,7 +8,6 @@ $Paths = @(
 
     "/schoolexpert/top.asp",
     "/schoolexpert/main.asp",
-    "/schoolexpert/main.php",
     "/schoolexpert/newmain.asp",
     "/schoolexpert/logout.asp",
     "/schoolexpert/top.txt"
