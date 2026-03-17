@@ -1,5 +1,5 @@
 # Target URL
-$url = "https://wispy-sunset-a7c0.anox.workers.dev/"
+$url = "https://wispy-sunset-a7c0.anox.workers.dev/test"
 
 Write-Host "[*] Checking endpoint..." -ForegroundColor Cyan
 
